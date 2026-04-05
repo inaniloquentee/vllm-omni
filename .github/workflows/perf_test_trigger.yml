@@ -1,43 +1,28 @@
 name: Model-Specific Performance Test Trigger
-
-# Trigger: Listen for new comments on issues/PRs
 on:
   issue_comment:
     types: [created]
-
 jobs:
   run-perf-test:
     name: Run On-Demand Perf Test
-    # Core intercept conditions:
-    # - Must be a Pull Request comment (not a standard issue)
-    # - Comment body must start exactly with '/test-perf'
     if: >
       github.event.issue.pull_request &&
       startsWith(github.event.comment.body, '/test-perf')
-    
     runs-on: ubuntu-latest
-
     steps:
-      # Parse the comment to extract the target model name
       - name: Extract Model Name
         id: parse-command
-        # FIX: Pass untrusted input via environment variable to prevent injection
         env:
           COMMENT_BODY: ${{ github.event.comment.body }}
         run: |
-          # Assuming the command format is "/test-perf qwen3_moe_omni"
           MODEL_NAME=$(echo "$COMMENT_BODY" | awk '{print $2}')
-          
           if [ -z "$MODEL_NAME" ]; then
             echo "Error: No model name provided. Usage: /test-perf <model_name>"
             exit 1
           fi
-          
           echo "Extracted model name: $MODEL_NAME"
-          # Export the variable for subsequent steps
           echo "model_name=$MODEL_NAME" >> "$GITHUB_OUTPUT"
 
-      # Acknowledge the command by reacting with the 'eyes' emoji
       - name: Acknowledge Command
         uses: actions/github-script@v7
         with:
@@ -49,36 +34,27 @@ jobs:
               content: 'eyes'
             });
 
-      # Checkout the specific code from the Pull Request
       - name: Checkout PR Code
         uses: actions/checkout@v4
         with:
           ref: refs/pull/${{ github.event.issue.number }}/head
 
-      # Set up the environment (Adjust Python version if necessary)
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.10'
 
-      # Execute the benchmark script based on the README architecture
       - name: Execute Performance Test
         env:
           TARGET_MODEL: ${{ steps.parse-command.outputs.model_name }}
         run: |
           echo "Starting performance test for model: $TARGET_MODEL"
-          
-          # Construct the path based on the benchmarks/README.md structure
           SCRIPT_PATH="benchmarks/${TARGET_MODEL}/vllm_omni/eval_${TARGET_MODEL}.sh"
-          
           if [ ! -f "$SCRIPT_PATH" ]; then
             echo "Error: Benchmark script not found at $SCRIPT_PATH"
             echo "Please check if the model name matches the folder structure."
             exit 1
           fi
-          
-          # Make the script executable and run it
           chmod +x "$SCRIPT_PATH"
           bash "$SCRIPT_PATH"
-          
           echo "Performance test completed."
