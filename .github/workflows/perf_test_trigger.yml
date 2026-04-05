@@ -7,7 +7,7 @@ jobs:
     name: Run On-Demand Perf Test
     if: >
       github.event.issue.pull_request &&
-      startsWith(github.event.comment.body, '/test-perf')
+      contains(github.event.comment.body, '/test-perf')
     runs-on: ubuntu-latest
     steps:
       - name: Extract Command Args
@@ -15,8 +15,9 @@ jobs:
         env:
           COMMENT_BODY: ${{ github.event.comment.body }}
         run: |
-          MODEL_NAME=$(echo "$COMMENT_BODY" | awk '{print $2}')
-          SPECIFIC_SCRIPT=$(echo "$COMMENT_BODY" | awk '{print $3}')
+          COMMAND_LINE=$(echo "$COMMENT_BODY" | grep -m 1 -o '/test-perf.*')
+          MODEL_NAME=$(echo "$COMMAND_LINE" | awk '{print $2}')
+          SPECIFIC_SCRIPT=$(echo "$COMMAND_LINE" | awk '{print $3}')
           if [ -z "$MODEL_NAME" ]; then
             echo "Error: No model name provided. Usage: /test-perf <model_name> [script_name]"
             exit 1
