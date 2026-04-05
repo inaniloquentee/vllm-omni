@@ -10,18 +10,20 @@ jobs:
       startsWith(github.event.comment.body, '/test-perf')
     runs-on: ubuntu-latest
     steps:
-      - name: Extract Model Name
+      - name: Extract Command Args
         id: parse-command
         env:
           COMMENT_BODY: ${{ github.event.comment.body }}
         run: |
           MODEL_NAME=$(echo "$COMMENT_BODY" | awk '{print $2}')
+          SPECIFIC_SCRIPT=$(echo "$COMMENT_BODY" | awk '{print $3}')
           if [ -z "$MODEL_NAME" ]; then
-            echo "Error: No model name provided. Usage: /test-perf <model_name>"
+            echo "Error: No model name provided. Usage: /test-perf <model_name> [script_name]"
             exit 1
           fi
           echo "Extracted model name: $MODEL_NAME"
           echo "model_name=$MODEL_NAME" >> "$GITHUB_OUTPUT"
+          echo "specific_script=$SPECIFIC_SCRIPT" >> "$GITHUB_OUTPUT"
 
       - name: Acknowledge Command
         uses: actions/github-script@v7
@@ -47,14 +49,38 @@ jobs:
       - name: Execute Performance Test
         env:
           TARGET_MODEL: ${{ steps.parse-command.outputs.model_name }}
+          SPECIFIC_SCRIPT: ${{ steps.parse-command.outputs.specific_script }}
         run: |
           echo "Starting performance test for model: $TARGET_MODEL"
-          SCRIPT_PATH="benchmarks/${TARGET_MODEL}/vllm_omni/eval_${TARGET_MODEL}.sh"
-          if [ ! -f "$SCRIPT_PATH" ]; then
-            echo "Error: Benchmark script not found at $SCRIPT_PATH"
-            echo "Please check if the model name matches the folder structure."
+          BASE_DIR="benchmarks/${TARGET_MODEL}/vllm_omni"
+          
+          if [ ! -d "$BASE_DIR" ]; then
+            echo "Error: Directory $BASE_DIR not found!"
             exit 1
           fi
-          chmod +x "$SCRIPT_PATH"
-          bash "$SCRIPT_PATH"
+          
+          if [ -n "$SPECIFIC_SCRIPT" ]; then
+            SCRIPT_PATH="$BASE_DIR/$SPECIFIC_SCRIPT"
+          else
+            SH_FILES=("$BASE_DIR"/*.sh)
+            if [ -e "${SH_FILES[0]}" ]; then
+              SCRIPT_PATH="${SH_FILES[0]}"
+              echo "Auto-discovered script: $SCRIPT_PATH"
+            else
+              echo "Error: No .sh script found. Usage: /test-perf $TARGET_MODEL <script_name>"
+              exit 1
+            fi
+          fi
+          
+          if [ ! -f "$SCRIPT_PATH" ]; then
+            echo "Error: Script $SCRIPT_PATH not found!"
+            exit 1
+          fi
+          
+          if [[ "$SCRIPT_PATH" == *.py ]]; then
+            python "$SCRIPT_PATH"
+          else
+            chmod +x "$SCRIPT_PATH"
+            bash "$SCRIPT_PATH"
+          fi
           echo "Performance test completed."
