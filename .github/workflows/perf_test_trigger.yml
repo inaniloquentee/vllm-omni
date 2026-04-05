@@ -1,0 +1,80 @@
+name: Model-Specific Performance Test Trigger
+on:
+  issue_comment:
+    types: [created]
+jobs:
+  run-perf-test:
+    name: Run On-Demand Perf Test
+    if: >
+      github.event.issue.pull_request &&
+      contains(github.event.comment.body, '/test-perf') &&
+      contains(fromJson('["OWNER", "MEMBER", "COLLABORATOR"]'), github.event.comment.author_association)
+    runs-on: self-hosted
+    steps:
+      - name: Extract Command Args
+        id: parse-command
+        env:
+          COMMENT_BODY: ${{ github.event.comment.body }}
+        run: |
+          COMMAND_LINE=$(echo "$COMMENT_BODY" | grep -m 1 -o '/test-perf.*')
+          MODEL_NAME=$(echo "$COMMAND_LINE" | awk '{print $2}')
+          SPECIFIC_SCRIPT=$(echo "$COMMAND_LINE" | awk '{print $3}')
+          if [ -z "$MODEL_NAME" ]; then
+            echo "Error: No model name provided. Usage: /test-perf <model_name> [script_name]"
+            exit 1
+          fi
+          echo "Extracted model name: $MODEL_NAME"
+          echo "model_name=$MODEL_NAME" >> "$GITHUB_OUTPUT"
+          echo "specific_script=$SPECIFIC_SCRIPT" >> "$GITHUB_OUTPUT"
+      - name: Acknowledge Command
+        uses: actions/github-script@v7
+        with:
+          script: |
+            github.rest.reactions.createForIssueComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              comment_id: context.payload.comment.id,
+              content: 'eyes'
+            });
+      - name: Checkout PR Code
+        uses: actions/checkout@v4
+        with:
+          ref: refs/pull/${{ github.event.issue.number }}/head
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+      - name: Execute Performance Test
+        env:
+          TARGET_MODEL: ${{ steps.parse-command.outputs.model_name }}
+          SPECIFIC_SCRIPT: ${{ steps.parse-command.outputs.specific_script }}
+        run: |
+          echo "Starting performance test for model: $TARGET_MODEL"
+          BASE_DIR="benchmarks/${TARGET_MODEL}/vllm_omni"
+          if [ ! -d "$BASE_DIR" ]; then
+            echo "Error: Directory $BASE_DIR not found!"
+            exit 1
+          fi
+          if [ -n "$SPECIFIC_SCRIPT" ]; then
+            SCRIPT_PATH="$BASE_DIR/$SPECIFIC_SCRIPT"
+          else
+            SH_FILES=("$BASE_DIR"/*.sh)
+            if [ -e "${SH_FILES[0]}" ]; then
+              SCRIPT_PATH="${SH_FILES[0]}"
+              echo "Auto-discovered script: $SCRIPT_PATH"
+            else
+              echo "Error: No .sh script found. Usage: /test-perf $TARGET_MODEL <script_name>"
+              exit 1
+            fi
+          fi
+          if [ ! -f "$SCRIPT_PATH" ]; then
+            echo "Error: Script $SCRIPT_PATH not found!"
+            exit 1
+          fi
+          if [[ "$SCRIPT_PATH" == *.py ]]; then
+            python "$SCRIPT_PATH"
+          else
+            chmod +x "$SCRIPT_PATH"
+            bash "$SCRIPT_PATH"
+          fi
+          echo "Performance test completed."
