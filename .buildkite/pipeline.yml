@@ -1,21 +1,6 @@
-# Document 1: Buildkite loads only this block on first parse. The next step resolves docs-only skip-ci
-# from git diff, then uploads document 2. When docs-only skip applies, image-build still runs if nightly-test
-# / main NIGHTLY so upload-nightly is not skipped together with test-ready/test-merge.
-#
-# Document 2: appended after `---`; same file, read by upload_pipeline_with_skip_ci.sh (not evaluated as a second pipeline by Buildkite).
-steps:
-  - label: ":github: Resolve skip-ci & upload pipeline"
-    key: upload-ci-pipeline
-    commands:
-      - "bash .buildkite/scripts/upload_pipeline_with_skip_ci.sh"
-    agents:
-      queue: "cpu_queue_premerge"
-
----
 steps:
   - label: ":docker: Build image"
     key: image-build
-    if: __IMAGE_BUILD_IF__
     commands:
       - "aws ecr-public get-login-password --region us-east-1 | docker login --username AWS --password-stdin public.ecr.aws/q9t5s3a7"
       - "docker build --progress=plain --file docker/Dockerfile.ci -t vllm-omni-ci ."
@@ -28,7 +13,7 @@ steps:
   - label: "Upload Ready Pipeline"
     depends_on: image-build
     key: upload-ready-pipeline
-    if: __UPLOAD_READY_IF__
+    if: build.branch != "main" && build.pull_request.labels includes "ready"
     commands:
       - buildkite-agent pipeline upload .buildkite/test-ready.yml
     agents:
@@ -38,7 +23,7 @@ steps:
   - label: "Upload Merge Pipeline"
     depends_on: image-build
     key: upload-merge-pipeline
-    if: __UPLOAD_MERGE_IF__
+    if: build.branch == "main" && build.env("NIGHTLY") != "1"
     commands:
       - buildkite-agent pipeline upload .buildkite/test-merge.yml
     agents:
@@ -53,3 +38,8 @@ steps:
       - buildkite-agent pipeline upload .buildkite/test-nightly.yml
     agents:
       queue: "cpu_queue_premerge"
+
+  # L5 Test - On-demand perf test triggered by '/test-perf' comment or 'perf-test' label
+  - label: "Trigger On-Demand Perf Test"
+    if: build.message =~ /\/test-perf/ || build.pull_request.labels includes "perf-test"
+    command: "buildkite-agent pipeline upload .buildkite/test-perf.yml"
