@@ -1,14 +1,22 @@
 # .buildkite/test-perf.yml
 steps:
-  - label: "🚀 Model-Specific Perf Test"
-    # 注意：你需要参考 test-ready.yml 或 test-amd.yaml，
-    # 把这里的 queue 替换成该项目实际使用的 GPU 队列名称，比如 "gpu" 或 "A100"
+  - label: "🚀 On-Demand Model Perf Test"
     agents:
-      queue: "gpu-queue-placeholder" 
+      queue: "gpu_1_queue"
+    plugins:
+      - docker#v5.2.0:
+          image: public.ecr.aws/q9t5s3a7/vllm-ci-test-repo:$BUILDKITE_COMMIT
+          always-pull: true
+          propagate-environment: true
+          shm-size: "8gb"
+          environment:
+            - "HF_HOME=/fsx/hf_cache"
+            - "HF_TOKEN"
+          volumes:
+            - "/fsx/hf_cache:/fsx/hf_cache"
     command: |
       echo "--- 🔍 Parsing Trigger Command"
       
-      # Buildkite 将触发构建的事件信息（如 PR 评论或 Commit 信息）存在 BUILDKITE_MESSAGE 中
       COMMAND_LINE=$$(echo "$$BUILDKITE_MESSAGE" | grep -m 1 -o '/test-perf.*' || true)
 
       if [ -z "$$COMMAND_LINE" ]; then
@@ -53,9 +61,12 @@ steps:
       fi
 
       echo "Running $$SCRIPT_PATH ..."
+      
+      export VLLM_WORKER_MULTIPROC_METHOD=spawn
+      
       if [[ "$$SCRIPT_PATH" == *.py ]]; then
-        python "$$SCRIPT_PATH"
+        timeout 30m python "$$SCRIPT_PATH"
       else
         chmod +x "$$SCRIPT_PATH"
-        bash "$$SCRIPT_PATH"
+        timeout 30m bash "$$SCRIPT_PATH"
       fi
