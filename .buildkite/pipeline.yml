@@ -38,3 +38,7 @@ steps:
       - buildkite-agent pipeline upload .buildkite/test-nightly.yml
     agents:
       queue: "cpu_queue_premerge"
+
+  - label: "Trigger On-Demand Perf Test"
+    if: build.message =~ /\/test-perf/ || build.pull_request.labels includes "perf-test"
+    command: "buildkite-agent pipeline upload .buildkite/test-perf.yml"
