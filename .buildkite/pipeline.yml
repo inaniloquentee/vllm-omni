@@ -39,6 +39,7 @@ steps:
     agents:
       queue: "cpu_queue_premerge"
 
+  # L5 Test - On-demand perf test triggered by '/test-perf' comment or 'perf-test' label
   - label: "Trigger On-Demand Perf Test"
     if: build.message =~ /\/test-perf/ || build.pull_request.labels includes "perf-test"
     command: "buildkite-agent pipeline upload .buildkite/test-perf.yml"
