@@ -15,10 +15,8 @@ steps:
             - "/fsx/hf_cache:/fsx/hf_cache"
     command: |
       echo "--- 🔍 Parsing Trigger Command or Labels"
-
       COMMAND_LINE=$$(echo "$$BUILDKITE_MESSAGE" | grep -m 1 -o '/test-perf.*' || true)
       MODEL_NAME=$$(echo "$$COMMAND_LINE" | awk '{print $$2}')
-
       if [ -z "$$MODEL_NAME" ] && [ -n "$$BUILDKITE_PULL_REQUEST_LABELS" ]; then
         LABEL_MATCH=$$(echo "$$BUILDKITE_PULL_REQUEST_LABELS" | grep -o -E '(model:|model-)[a-zA-Z0-9_-]+' | head -1 || true)
         if [ -n "$$LABEL_MATCH" ]; then
@@ -26,34 +24,26 @@ steps:
           echo "Extracted model name from PR label: $$MODEL_NAME"
         fi
       fi
-
       if [ -z "$$MODEL_NAME" ]; then
         echo "❌ Error: No model name provided."
         echo "Usage: Add a commit message '/test-perf <model>' OR add a PR label 'model:<model>'"
         exit 1
       fi
-      
       echo "Target Model: $$MODEL_NAME"
-      
       echo "--- 🚀 Discovering Performance & Accuracy Tests"
       BASE_DIR="benchmarks/$${MODEL_NAME}/vllm_omni"
-      
       if [ ! -d "$$BASE_DIR" ]; then
         echo "❌ Error: Directory $$BASE_DIR not found!"
         exit 1
       fi
       TEST_SCRIPTS=$$(find "$$BASE_DIR" -maxdepth 1 -type f \( -name "*.sh" -o -name "*.py" \) | sort)
-      
       if [ -z "$$TEST_SCRIPTS" ]; then
         echo "❌ Error: No .sh or .py test scripts found in $$BASE_DIR"
         exit 1
       fi
-      
       echo "Discovered the following test scripts:"
       echo "$$TEST_SCRIPTS"
-      
       export VLLM_WORKER_MULTIPROC_METHOD=spawn
-
       for SCRIPT_PATH in $$TEST_SCRIPTS; do
         echo "--- ⚡ Running $$SCRIPT_PATH"
         if [[ "$$SCRIPT_PATH" == *.py ]]; then
@@ -63,5 +53,4 @@ steps:
           timeout 30m bash "$$SCRIPT_PATH"
         fi
       done
-      
       echo "--- ✅ All tests for $$MODEL_NAME completed successfully!"
