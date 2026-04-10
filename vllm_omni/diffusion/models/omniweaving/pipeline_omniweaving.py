@@ -18,9 +18,9 @@ from diffusers.video_processor import VideoProcessor
 from torch import nn
 from transformers import (
     AutoConfig,
+    AutoProcessor,
     ByT5Tokenizer,
-    Qwen2_5_VLForConditionalGeneration, # [OmniWeaving] Unified MLLM
-    AutoProcessor,                      # [OmniWeaving] Processor for MLLM
+    Qwen2_5_VLForConditionalGeneration,
 )
 from vllm.model_executor.models.utils import AutoWeightsLoader
 
@@ -113,9 +113,7 @@ class OmniWeavingPipeline(
         model = od_config.model
         local_files_only = os.path.exists(model)
 
-        # ==========================================
         # [OmniWeaving] 1. Unified MLLM Initialization
-        # ==========================================
         # Replaces separate Qwen-Text and SigLIP with a single unified MLLM
         self.processor = AutoProcessor.from_pretrained(
             model, local_files_only=local_files_only
@@ -128,8 +126,12 @@ class OmniWeavingPipeline(
         self.tokenizer_2 = ByT5Tokenizer.from_pretrained(
             model, subfolder="tokenizer_2", local_files_only=local_files_only
         )
-        t5_config = AutoConfig.from_pretrained(model, subfolder="text_encoder_2", local_files_only=local_files_only)
-        self.text_encoder_2 = T5EncoderModel(t5_config, prefix="text_encoder_2").to(dtype=dtype, device=self.device)
+        t5_config = AutoConfig.from_pretrained(
+            model, subfolder="text_encoder_2", local_files_only=local_files_only
+        )
+        self.text_encoder_2 = T5EncoderModel(
+            t5_config, prefix="text_encoder_2"
+        ).to(dtype=dtype, device=self.device)
 
         self.vae = AutoencoderKLHunyuanVideo15.from_pretrained(
             model, subfolder="vae", torch_dtype=torch.float32, local_files_only=local_files_only
@@ -142,8 +144,12 @@ class OmniWeavingPipeline(
         if od_config.flow_shift is not None:
             self.scheduler._shift = od_config.flow_shift
 
-        transformer_kwargs = get_transformer_config_kwargs(od_config.tf_model_config, HunyuanVideo15Transformer3DModel)
-        self.transformer = HunyuanVideo15Transformer3DModel(od_config=od_config, **transformer_kwargs)
+        transformer_kwargs = get_transformer_config_kwargs(
+            od_config.tf_model_config, HunyuanVideo15Transformer3DModel
+        )
+        self.transformer = HunyuanVideo15Transformer3DModel(
+            od_config=od_config, **transformer_kwargs
+        )
 
         self.use_meanflow = getattr(od_config.tf_model_config, "use_meanflow", False)
 
@@ -172,15 +178,17 @@ class OmniWeavingPipeline(
         )
         self.num_channels_latents = self.vae.config.latent_channels if hasattr(self.vae, "config") else 32
 
+        # fmt: off
         self.system_message = "You are a helpful assistant. Describe the video by detailing the following aspects: \
         1. The main content and theme of the video. \
         2. The color, shape, size, texture, quantity, text, and spatial relationships of the objects. \
         3. Actions, events, behaviors temporal relationships, physical movement changes of the objects. \
         4. background environment, light, style and atmosphere. \
-        5. camera angles, movements, and transitions used in the video."
-        
+        5. camera angles, movements, and transitions used in the video."  # noqa: E501
+        # fmt: on
+
         self.tokenizer_2_max_length = 256
-        
+
         # [OmniWeaving] Configuration for deepstack layers
         self.deepstack_indices = [8, 16, 24]
 
@@ -212,7 +220,7 @@ class OmniWeavingPipeline(
         dtype: torch.dtype,
     ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         """
-        [OmniWeaving] 
+        [OmniWeaving]
         Process both text and image through Qwen2.5-VL to extract:
         1. Main prompt embeddings (last layer)
         2. Attention mask
@@ -225,7 +233,7 @@ class OmniWeavingPipeline(
                 # Add image condition if available
                 content.append({"type": "image", "image": image})
             content.append({"type": "text", "text": p if p else " "})
-            
+
             messages.append([
                 {"role": "system", "content": self.system_message},
                 {"role": "user", "content": content}
@@ -233,10 +241,10 @@ class OmniWeavingPipeline(
 
         # Prepare inputs using the MLLM processor
         text = self.processor.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
-        
+
         # For batch processing, images need to be repeated if present
         images_list = [image] * len(prompt) if image is not None else None
-        
+
         inputs = self.processor(
             text=text,
             images=images_list,
@@ -251,13 +259,14 @@ class OmniWeavingPipeline(
         all_hidden_states = outputs.hidden_states
 
         # Extract main features (usually the last layer before LM head)
-        # Note: adjust index if you want to skip layers (e.g., -2)
         prompt_embeds = all_hidden_states[-1].to(dtype=dtype)
         prompt_attention_mask = inputs.attention_mask.to(device=device)
 
         # [OmniWeaving] Extract deepstack features for multi-layer weaving
-        # Shape will be: (num_layers, batch_size, seq_len, hidden_dim)
-        stack_list = [all_hidden_states[idx].to(dtype=dtype) for idx in self.deepstack_indices]
+        stack_list = [
+            all_hidden_states[idx].to(dtype=dtype)
+            for idx in self.deepstack_indices
+        ]
         deepstack_hidden_states = torch.stack(stack_list, dim=0)
 
         return prompt_embeds, prompt_attention_mask, deepstack_hidden_states
@@ -280,7 +289,9 @@ class OmniWeavingPipeline(
                     device=device,
                     dtype=dtype,
                 )
-                glyph_text_embeds_mask = torch.zeros((1, self.tokenizer_2_max_length), device=device, dtype=torch.int64)
+                glyph_text_embeds_mask = torch.zeros(
+                    (1, self.tokenizer_2_max_length), device=device, dtype=torch.int64
+                )
             else:
                 txt_tokens = self.tokenizer_2(
                     glyph_text,
@@ -301,7 +312,10 @@ class OmniWeavingPipeline(
             prompt_embeds_list.append(glyph_text_embeds)
             prompt_embeds_mask_list.append(glyph_text_embeds_mask)
 
-        return torch.cat(prompt_embeds_list, dim=0), torch.cat(prompt_embeds_mask_list, dim=0)
+        prompt_embeds_tensor = torch.cat(prompt_embeds_list, dim=0)
+        prompt_embeds_mask_tensor = torch.cat(prompt_embeds_mask_list, dim=0)
+
+        return prompt_embeds_tensor, prompt_embeds_mask_tensor
 
     def encode_prompt(
         self,
@@ -315,8 +329,11 @@ class OmniWeavingPipeline(
         prompt = [prompt] if isinstance(prompt, str) else prompt
 
         # Process positive prompt and image
-        prompt_embeds, prompt_embeds_mask, deepstack = self._get_mllm_prompt_embeds(prompt, image, device, dtype)
-        prompt_embeds_2, prompt_embeds_mask_2 = self._get_byte5_prompt_embeds(prompt, device, dtype)
+        out_pos = self._get_mllm_prompt_embeds(prompt, image, device, dtype)
+        prompt_embeds, prompt_embeds_mask, deepstack = out_pos
+
+        out_pos_byt5 = self._get_byte5_prompt_embeds(prompt, device, dtype)
+        prompt_embeds_2, prompt_embeds_mask_2 = out_pos_byt5
 
         prompt_embeds_mask = prompt_embeds_mask.to(dtype=dtype)
         prompt_embeds_mask_2 = prompt_embeds_mask_2.to(dtype=dtype)
@@ -329,15 +346,22 @@ class OmniWeavingPipeline(
 
         if do_classifier_free_guidance:
             # For I2V CFG, the negative prompt still sees the image but with empty text
-            neg_text = [""] if negative_prompt is None else ([negative_prompt] if isinstance(negative_prompt, str) else negative_prompt)
-            
-            negative_prompt_embeds, negative_prompt_embeds_mask, negative_deepstack = self._get_mllm_prompt_embeds(
-                neg_text, image, device, dtype
-            )
-            negative_prompt_embeds_2, negative_prompt_embeds_mask_2 = self._get_byte5_prompt_embeds(
-                neg_text, device, dtype
-            )
-            
+            if negative_prompt is None:
+                neg_text = [""]
+            elif isinstance(negative_prompt, str):
+                neg_text = [negative_prompt]
+            else:
+                neg_text = negative_prompt
+
+            out_neg = self._get_mllm_prompt_embeds(neg_text, image, device, dtype)
+            negative_prompt_embeds = out_neg[0]
+            negative_prompt_embeds_mask = out_neg[1]
+            negative_deepstack = out_neg[2]
+
+            out_neg_byt5 = self._get_byte5_prompt_embeds(neg_text, device, dtype)
+            negative_prompt_embeds_2 = out_neg_byt5[0]
+            negative_prompt_embeds_mask_2 = out_neg_byt5[1]
+
             negative_prompt_embeds_mask = negative_prompt_embeds_mask.to(dtype=dtype)
             negative_prompt_embeds_mask_2 = negative_prompt_embeds_mask_2.to(dtype=dtype)
 
@@ -364,7 +388,8 @@ class OmniWeavingPipeline(
         """Encode image to VAE latents for first-frame conditioning."""
         video_processor = VideoProcessor(vae_scale_factor=self.vae_scale_factor_spatial)
         image_tensor = video_processor.preprocess(image, height=height, width=width)
-        image_tensor = image_tensor.unsqueeze(2).to(device=device, dtype=self.vae.dtype)  # [B, C, 1, H, W]
+        # shape: [B, C, 1, H, W]
+        image_tensor = image_tensor.unsqueeze(2).to(device=device, dtype=self.vae.dtype)
         image_latents = retrieve_latents(self.vae.encode(image_tensor), sample_mode="argmax")
         image_latents = image_latents * self.vae.config.scaling_factor
         return image_latents
@@ -386,7 +411,9 @@ class OmniWeavingPipeline(
         latent_condition[:, :, 1:, :, :] = 0
         latent_condition = latent_condition.to(device=device, dtype=dtype)
 
-        latent_mask = torch.zeros(batch, 1, frames, lat_height, lat_width, dtype=dtype, device=device)
+        latent_mask = torch.zeros(
+            batch, 1, frames, lat_height, lat_width, dtype=dtype, device=device
+        )
         latent_mask[:, :, 0, :, :] = 1.0
 
         return latent_condition, latent_mask
@@ -414,7 +441,9 @@ class OmniWeavingPipeline(
             int(width) // self.vae_scale_factor_spatial,
         )
         if isinstance(generator, list) and len(generator) != batch_size:
-            raise ValueError(f"Generator list length {len(generator)} does not match batch size {batch_size}.")
+            raise ValueError(
+                f"Generator list length {len(generator)} does not match batch size {batch_size}."
+            )
         latents = randn_tensor(shape, generator=generator, device=device, dtype=dtype)
         return latents
 
@@ -435,13 +464,20 @@ class OmniWeavingPipeline(
     ) -> DiffusionOutput:
         if len(req.prompts) > 1:
             raise ValueError("This model only supports a single prompt per request.")
+
         if len(req.prompts) == 1:
-            prompt = req.prompts[0] if isinstance(req.prompts[0], str) else req.prompts[0].get("prompt")
-            negative_prompt = None if isinstance(req.prompts[0], str) else req.prompts[0].get("negative_prompt")
+            req_prompt = req.prompts[0]
+            prompt = req_prompt if isinstance(req_prompt, str) else req_prompt.get("prompt")
+            negative_prompt = (
+                None if isinstance(req_prompt, str) else req_prompt.get("negative_prompt")
+            )
         else:
             raise ValueError("Prompt is required for OmniWeaving I2V generation.")
 
-        multi_modal_data = req.prompts[0].get("multi_modal_data", {}) if not isinstance(req.prompts[0], str) else {}
+        multi_modal_data = {}
+        if not isinstance(req.prompts[0], str):
+            multi_modal_data = req.prompts[0].get("multi_modal_data", {})
+
         raw_image = multi_modal_data.get("image", None)
         if isinstance(raw_image, list):
             if len(raw_image) > 1:
@@ -449,7 +485,7 @@ class OmniWeavingPipeline(
             raw_image = raw_image[0]
 
         if raw_image is None:
-            raise ValueError("Image is required for I2V generation. Pass it via multi_modal_data={'image': <image>}")
+            raise ValueError("Image is required. Pass via multi_modal_data={'image': <image>}")
 
         if isinstance(raw_image, str):
             image = PIL.Image.open(raw_image).convert("RGB")
@@ -477,25 +513,24 @@ class OmniWeavingPipeline(
             generator = torch.Generator(device=device).manual_seed(req.sampling_params.seed)
 
         # [OmniWeaving] Encode Prompt & Extract Deepstack Features
-        (
-            prompt_embeds,
-            prompt_embeds_mask,
-            deepstack_embeds,
-            prompt_embeds_2,
-            prompt_embeds_mask_2,
-            negative_prompt_embeds,
-            negative_prompt_embeds_mask,
-            negative_deepstack_embeds,
-            negative_prompt_embeds_2,
-            negative_prompt_embeds_mask_2,
-        ) = self.encode_prompt(
+        encode_output = self.encode_prompt(
             prompt=prompt,
-            image=image, # Handled by unified MLLM now
+            image=image,
             device=device,
             dtype=dtype,
             negative_prompt=negative_prompt,
             do_classifier_free_guidance=do_cfg,
         )
+        prompt_embeds = encode_output[0]
+        prompt_embeds_mask = encode_output[1]
+        deepstack_embeds = encode_output[2]
+        prompt_embeds_2 = encode_output[3]
+        prompt_embeds_mask_2 = encode_output[4]
+        negative_prompt_embeds = encode_output[5]
+        negative_prompt_embeds_mask = encode_output[6]
+        negative_deepstack_embeds = encode_output[7]
+        negative_prompt_embeds_2 = encode_output[8]
+        negative_prompt_embeds_mask_2 = encode_output[9]
 
         batch_size = prompt_embeds.shape[0]
 
@@ -510,7 +545,9 @@ class OmniWeavingPipeline(
             latents=req.sampling_params.latents,
         )
 
-        cond_latents, mask = self.prepare_cond_latents_and_mask(latents, image, height, width, dtype, device)
+        cond_latents, mask = self.prepare_cond_latents_and_mask(
+            latents, image, height, width, dtype, device
+        )
 
         sigmas = np.linspace(1.0, 0.0, num_steps + 1)[:-1]
         self.scheduler.set_timesteps(sigmas=sigmas, device=device)
@@ -540,8 +577,8 @@ class OmniWeavingPipeline(
                     "encoder_attention_mask": prompt_embeds_mask,
                     "encoder_hidden_states_2": prompt_embeds_2,
                     "encoder_attention_mask_2": prompt_embeds_mask_2,
-                    "image_embeds": None, # [OmniWeaving] SigLIP is removed, set to None
-                    "all_stack_text_states": deepstack_embeds, # [OmniWeaving] Inject multi-layer weaving features
+                    "image_embeds": None,
+                    "all_stack_text_states": deepstack_embeds,
                     "return_dict": False,
                 }
 
@@ -556,7 +593,7 @@ class OmniWeavingPipeline(
                         "encoder_hidden_states_2": negative_prompt_embeds_2,
                         "encoder_attention_mask_2": negative_prompt_embeds_mask_2,
                         "image_embeds": None,
-                        "all_stack_text_states": negative_deepstack_embeds, # [OmniWeaving] Negative weaving features
+                        "all_stack_text_states": negative_deepstack_embeds,
                         "return_dict": False,
                     }
 
