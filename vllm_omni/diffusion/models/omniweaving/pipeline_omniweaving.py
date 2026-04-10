@@ -44,8 +44,10 @@ from vllm_omni.platforms import current_omni_platform
 
 logger = logging.getLogger(__name__)
 
+
 def get_omniweaving_post_process_func(od_config: OmniDiffusionConfig):
     return get_hunyuan_video_15_post_process_func(od_config)
+
 
 def get_omniweaving_pre_process_func(od_config: OmniDiffusionConfig):
     """Pre-process function for OmniWeaving I2V: load and resize image."""
@@ -89,6 +91,7 @@ def get_omniweaving_pre_process_func(od_config: OmniDiffusionConfig):
             req.sampling_params.width = width
 
         return req
+
     return pre_process_func
 
 
@@ -115,9 +118,7 @@ class OmniWeavingPipeline(
 
         # [OmniWeaving] 1. Unified MLLM Initialization
         # Replaces separate Qwen-Text and SigLIP with a single unified MLLM
-        self.processor = AutoProcessor.from_pretrained(
-            model, local_files_only=local_files_only
-        )
+        self.processor = AutoProcessor.from_pretrained(model, local_files_only=local_files_only)
         self.mllm = Qwen2_5_VLForConditionalGeneration.from_pretrained(
             model, torch_dtype=dtype, local_files_only=local_files_only
         ).to(self.device)
@@ -126,12 +127,8 @@ class OmniWeavingPipeline(
         self.tokenizer_2 = ByT5Tokenizer.from_pretrained(
             model, subfolder="tokenizer_2", local_files_only=local_files_only
         )
-        t5_config = AutoConfig.from_pretrained(
-            model, subfolder="text_encoder_2", local_files_only=local_files_only
-        )
-        self.text_encoder_2 = T5EncoderModel(
-            t5_config, prefix="text_encoder_2"
-        ).to(dtype=dtype, device=self.device)
+        t5_config = AutoConfig.from_pretrained(model, subfolder="text_encoder_2", local_files_only=local_files_only)
+        self.text_encoder_2 = T5EncoderModel(t5_config, prefix="text_encoder_2").to(dtype=dtype, device=self.device)
 
         self.vae = AutoencoderKLHunyuanVideo15.from_pretrained(
             model, subfolder="vae", torch_dtype=torch.float32, local_files_only=local_files_only
@@ -144,12 +141,8 @@ class OmniWeavingPipeline(
         if od_config.flow_shift is not None:
             self.scheduler._shift = od_config.flow_shift
 
-        transformer_kwargs = get_transformer_config_kwargs(
-            od_config.tf_model_config, HunyuanVideo15Transformer3DModel
-        )
-        self.transformer = HunyuanVideo15Transformer3DModel(
-            od_config=od_config, **transformer_kwargs
-        )
+        transformer_kwargs = get_transformer_config_kwargs(od_config.tf_model_config, HunyuanVideo15Transformer3DModel)
+        self.transformer = HunyuanVideo15Transformer3DModel(od_config=od_config, **transformer_kwargs)
 
         self.use_meanflow = getattr(od_config.tf_model_config, "use_meanflow", False)
 
@@ -234,10 +227,7 @@ class OmniWeavingPipeline(
                 content.append({"type": "image", "image": image})
             content.append({"type": "text", "text": p if p else " "})
 
-            messages.append([
-                {"role": "system", "content": self.system_message},
-                {"role": "user", "content": content}
-            ])
+            messages.append([{"role": "system", "content": self.system_message}, {"role": "user", "content": content}])
 
         # Prepare inputs using the MLLM processor
         text = self.processor.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
@@ -245,12 +235,7 @@ class OmniWeavingPipeline(
         # For batch processing, images need to be repeated if present
         images_list = [image] * len(prompt) if image is not None else None
 
-        inputs = self.processor(
-            text=text,
-            images=images_list,
-            padding=True,
-            return_tensors="pt"
-        ).to(device)
+        inputs = self.processor(text=text, images=images_list, padding=True, return_tensors="pt").to(device)
 
         # Forward pass: MUST set output_hidden_states=True to extract deep layers
         with torch.no_grad():
@@ -263,10 +248,7 @@ class OmniWeavingPipeline(
         prompt_attention_mask = inputs.attention_mask.to(device=device)
 
         # [OmniWeaving] Extract deepstack features for multi-layer weaving
-        stack_list = [
-            all_hidden_states[idx].to(dtype=dtype)
-            for idx in self.deepstack_indices
-        ]
+        stack_list = [all_hidden_states[idx].to(dtype=dtype) for idx in self.deepstack_indices]
         deepstack_hidden_states = torch.stack(stack_list, dim=0)
 
         return prompt_embeds, prompt_attention_mask, deepstack_hidden_states
@@ -289,9 +271,7 @@ class OmniWeavingPipeline(
                     device=device,
                     dtype=dtype,
                 )
-                glyph_text_embeds_mask = torch.zeros(
-                    (1, self.tokenizer_2_max_length), device=device, dtype=torch.int64
-                )
+                glyph_text_embeds_mask = torch.zeros((1, self.tokenizer_2_max_length), device=device, dtype=torch.int64)
             else:
                 txt_tokens = self.tokenizer_2(
                     glyph_text,
@@ -332,8 +312,8 @@ class OmniWeavingPipeline(
         out_pos = self._get_mllm_prompt_embeds(prompt, image, device, dtype)
         prompt_embeds, prompt_embeds_mask, deepstack = out_pos
 
-        out_pos_byt5 = self._get_byte5_prompt_embeds(prompt, device, dtype)
-        prompt_embeds_2, prompt_embeds_mask_2 = out_pos_byt5
+        out_pos_byte5 = self._get_byte5_prompt_embeds(prompt, device, dtype)
+        prompt_embeds_2, prompt_embeds_mask_2 = out_pos_byte5
 
         prompt_embeds_mask = prompt_embeds_mask.to(dtype=dtype)
         prompt_embeds_mask_2 = prompt_embeds_mask_2.to(dtype=dtype)
@@ -358,9 +338,9 @@ class OmniWeavingPipeline(
             negative_prompt_embeds_mask = out_neg[1]
             negative_deepstack = out_neg[2]
 
-            out_neg_byt5 = self._get_byte5_prompt_embeds(neg_text, device, dtype)
-            negative_prompt_embeds_2 = out_neg_byt5[0]
-            negative_prompt_embeds_mask_2 = out_neg_byt5[1]
+            out_neg_byte5 = self._get_byte5_prompt_embeds(neg_text, device, dtype)
+            negative_prompt_embeds_2 = out_neg_byte5[0]
+            negative_prompt_embeds_mask_2 = out_neg_byte5[1]
 
             negative_prompt_embeds_mask = negative_prompt_embeds_mask.to(dtype=dtype)
             negative_prompt_embeds_mask_2 = negative_prompt_embeds_mask_2.to(dtype=dtype)
@@ -411,9 +391,7 @@ class OmniWeavingPipeline(
         latent_condition[:, :, 1:, :, :] = 0
         latent_condition = latent_condition.to(device=device, dtype=dtype)
 
-        latent_mask = torch.zeros(
-            batch, 1, frames, lat_height, lat_width, dtype=dtype, device=device
-        )
+        latent_mask = torch.zeros(batch, 1, frames, lat_height, lat_width, dtype=dtype, device=device)
         latent_mask[:, :, 0, :, :] = 1.0
 
         return latent_condition, latent_mask
@@ -441,9 +419,7 @@ class OmniWeavingPipeline(
             int(width) // self.vae_scale_factor_spatial,
         )
         if isinstance(generator, list) and len(generator) != batch_size:
-            raise ValueError(
-                f"Generator list length {len(generator)} does not match batch size {batch_size}."
-            )
+            raise ValueError(f"Generator list length {len(generator)} does not match batch size {batch_size}.")
         latents = randn_tensor(shape, generator=generator, device=device, dtype=dtype)
         return latents
 
@@ -468,9 +444,7 @@ class OmniWeavingPipeline(
         if len(req.prompts) == 1:
             req_prompt = req.prompts[0]
             prompt = req_prompt if isinstance(req_prompt, str) else req_prompt.get("prompt")
-            negative_prompt = (
-                None if isinstance(req_prompt, str) else req_prompt.get("negative_prompt")
-            )
+            negative_prompt = None if isinstance(req_prompt, str) else req_prompt.get("negative_prompt")
         else:
             raise ValueError("Prompt is required for OmniWeaving I2V generation.")
 
@@ -545,9 +519,7 @@ class OmniWeavingPipeline(
             latents=req.sampling_params.latents,
         )
 
-        cond_latents, mask = self.prepare_cond_latents_and_mask(
-            latents, image, height, width, dtype, device
-        )
+        cond_latents, mask = self.prepare_cond_latents_and_mask(latents, image, height, width, dtype, device)
 
         sigmas = np.linspace(1.0, 0.0, num_steps + 1)[:-1]
         self.scheduler.set_timesteps(sigmas=sigmas, device=device)
