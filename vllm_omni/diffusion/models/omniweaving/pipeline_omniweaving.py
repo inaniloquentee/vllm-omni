@@ -811,8 +811,8 @@ class OmniWeavingPipeline(
             map_k(f"{p}.mlp.fc1.bias", f"{t_p}.proj_mlp.bias")
             map_k(f"{p}.mlp.fc2.weight", f"{t_p}.proj_out.weight")
             map_k(f"{p}.mlp.fc2.bias", f"{t_p}.proj_out.bias")
-            map_k(f("mod.linear.weight"), f("{t_p}.norm.linear.weight"))
-            map_k(f("mod.linear.bias"), f("{t_p}.norm.linear.bias"))
+            map_k(f"{p}.mod.linear.weight", f"{t_p}.norm.linear.weight")
+            map_k(f"{p}.mod.linear.bias", f"{t_p}.norm.linear.bias")
 
         return mapped_tf
 
