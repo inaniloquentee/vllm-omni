@@ -137,6 +137,7 @@ class OmniWeavingPipeline(
         qwen_path = "Qwen/Qwen2.5-VL-7B-Instruct"
         try:
             from modelscope import snapshot_download
+
             qwen_path = snapshot_download("qwen/Qwen2.5-VL-7B-Instruct")
         except ImportError:
             os.environ["HF_ENDPOINT"] = "https://hf-mirror.com"
@@ -810,8 +811,8 @@ class OmniWeavingPipeline(
             map_k(f"{p}.mlp.fc1.bias", f"{t_p}.proj_mlp.bias")
             map_k(f"{p}.mlp.fc2.weight", f"{t_p}.proj_out.weight")
             map_k(f"{p}.mlp.fc2.bias", f"{t_p}.proj_out.bias")
-            map_k(f"{p}.mod.linear.weight", f"{t_p}.norm.linear.weight")
-            map_k(f"{p}.mod.linear.bias", f"{t_p}.norm.linear.bias")
+            map_k(f("mod.linear.weight"), f("{t_p}.norm.linear.weight"))
+            map_k(f("mod.linear.bias"), f("{t_p}.norm.linear.bias"))
 
         return mapped_tf
 
