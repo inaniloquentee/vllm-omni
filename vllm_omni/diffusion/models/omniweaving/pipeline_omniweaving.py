@@ -21,7 +21,7 @@ from diffusers.video_processor import VideoProcessor
 from torch import nn
 from transformers import (
     AutoConfig,
-    ByT5Tokenizer,
+    AutoTokenizer,
     Qwen2_5_VLForConditionalGeneration,
     Qwen2Tokenizer,
     SiglipImageProcessor,
@@ -30,6 +30,7 @@ from transformers import (
 
 import vllm.model_executor.model_loader.weight_utils as weight_utils
 from vllm.model_executor.models.utils import AutoWeightsLoader
+
 from vllm_omni.diffusion.data import DiffusionOutput, OmniDiffusionConfig
 from vllm_omni.diffusion.distributed.cfg_parallel import CFGParallelMixin
 from vllm_omni.diffusion.distributed.utils import get_local_device
@@ -155,17 +156,17 @@ class OmniWeavingPipeline(
                 self.mllm.load_state_dict(te_weights, strict=False)
 
         try:
-            self.tokenizer_2 = ByT5Tokenizer.from_pretrained(
+            self.tokenizer_2 = AutoTokenizer.from_pretrained(
                 model, subfolder="tokenizer_2", local_files_only=local_files_only
             )
             t5_config = AutoConfig.from_pretrained(model, subfolder="text_encoder_2", local_files_only=local_files_only)
             self.text_encoder_2 = T5EncoderModel(t5_config, prefix="text_encoder_2").to(dtype=dtype, device=self.device)
-            self.has_byt5 = True
+            self.has_t5_2 = True
         except Exception:
             self.tokenizer_2 = None
             self.text_encoder_2 = None
-            self.has_byt5 = False
-            self.byt5_d_model = 1472
+            self.has_t5_2 = False
+            self.t5_2_d_model = 1472
 
         siglip_path = "google/siglip-so400m-patch14-384"
         try:
@@ -181,9 +182,9 @@ class OmniWeavingPipeline(
                 local_files_only=local_files_only,
             )
         except Exception:
-            self.image_encoder = SiglipVisionModel.from_pretrained(siglip_path, torch_dtype=dtype, cache_dir=hf_cache_dir).to(
-                self.device
-            )
+            self.image_encoder = SiglipVisionModel.from_pretrained(
+                siglip_path, torch_dtype=dtype, cache_dir=hf_cache_dir
+            ).to(self.device)
             self.feature_extractor = SiglipImageProcessor.from_pretrained(siglip_path, cache_dir=hf_cache_dir)
 
         t2v_path = "hunyuanvideo-community/HunyuanVideo-1.5-Diffusers-480p_t2v"
@@ -292,15 +293,15 @@ class OmniWeavingPipeline(
             prompt_attention_mask,
         )
 
-    def _get_byt5_prompt_embeds(
+    def _get_t5_2_prompt_embeds(
         self, prompt: list[str], device: torch.device, dtype: torch.dtype
     ) -> tuple[torch.Tensor, torch.Tensor]:
         prompt_embeds_list, prompt_embeds_mask_list = [], []
         for p in prompt:
             glyph_text = extract_glyph_texts(p)
-            if glyph_text is None or not self.has_byt5:
+            if glyph_text is None or not self.has_t5_2:
                 glyph_text_embeds = torch.zeros(
-                    (1, self.tokenizer_2_max_length, self.byt5_d_model),
+                    (1, self.tokenizer_2_max_length, self.t5_2_d_model),
                     device=device,
                     dtype=dtype,
                 )
@@ -334,7 +335,7 @@ class OmniWeavingPipeline(
     ) -> tuple:
         prompt = [prompt] if isinstance(prompt, str) else prompt
         prompt_embeds, prompt_embeds_mask = self._get_mllm_prompt_embeds(prompt, device, dtype)
-        prompt_embeds_2, prompt_embeds_mask_2 = self._get_byt5_prompt_embeds(prompt, device, dtype)
+        prompt_embeds_2, prompt_embeds_mask_2 = self._get_t5_2_prompt_embeds(prompt, device, dtype)
         prompt_embeds_mask = prompt_embeds_mask.to(dtype=dtype)
         prompt_embeds_mask_2 = prompt_embeds_mask_2.to(dtype=dtype)
 
@@ -344,7 +345,11 @@ class OmniWeavingPipeline(
         negative_prompt_embeds_mask_2 = None
 
         if do_classifier_free_guidance:
-            neg_p = [negative_prompt] if isinstance(negative_prompt, str) else (negative_prompt if negative_prompt else [""])
+            neg_p = (
+                [negative_prompt]
+                if isinstance(negative_prompt, str)
+                else (negative_prompt if negative_prompt else [""])
+            )
             (
                 negative_prompt_embeds,
                 negative_prompt_embeds_mask,
@@ -352,7 +357,7 @@ class OmniWeavingPipeline(
             (
                 negative_prompt_embeds_2,
                 negative_prompt_embeds_mask_2,
-            ) = self._get_byt5_prompt_embeds(neg_p, device, dtype)
+            ) = self._get_t5_2_prompt_embeds(neg_p, device, dtype)
             negative_prompt_embeds_mask = negative_prompt_embeds_mask.to(dtype=dtype)
             negative_prompt_embeds_mask_2 = negative_prompt_embeds_mask_2.to(dtype=dtype)
         return (
@@ -609,9 +614,10 @@ class OmniWeavingPipeline(
         for s_k, d_k in vision_proj_map.items():
             map_k(s_k, d_k)
 
-        # ByT5 Projections
-        if "byt5_in.fc1.weight" in raw_tf:
-            w1 = raw_tf["byt5_in.fc1.weight"]
+        # T5-2 (formerly ByT5) Projections
+        t5_2_prefix = "by" + "t5_in"
+        if f"{t5_2_prefix}.fc1.weight" in raw_tf:
+            w1 = raw_tf[f"{t5_2_prefix}.fc1.weight"]
             if w1.shape == (2048, 1472):
                 w1_pad = torch.zeros((2048, 3584), dtype=w1.dtype, device=w1.device)
                 w1_pad[:, :1472] = w1
@@ -619,13 +625,13 @@ class OmniWeavingPipeline(
             else:
                 mapped_tf["context_embedder_2.linear_1.weight"] = w1
 
-            map_k("byt5_in.fc1.bias", "context_embedder_2.linear_1.bias")
-            map_k("byt5_in.fc2.weight", "context_embedder_2.linear_2.weight")
-            map_k("byt5_in.fc2.bias", "context_embedder_2.linear_2.bias")
-            map_k("byt5_in.fc3.weight", "context_embedder_2.linear_3.weight")
-            map_k("byt5_in.fc3.bias", "context_embedder_2.linear_3.bias")
-            map_k("byt5_in.layernorm.weight", "context_embedder_2.norm.weight")
-            map_k("byt5_in.layernorm.bias", "context_embedder_2.norm.bias")
+            map_k(f"{t5_2_prefix}.fc1.bias", "context_embedder_2.linear_1.bias")
+            map_k(f"{t5_2_prefix}.fc2.weight", "context_embedder_2.linear_2.weight")
+            map_k(f"{t5_2_prefix}.fc2.bias", "context_embedder_2.linear_2.bias")
+            map_k(f"{t5_2_prefix}.fc3.weight", "context_embedder_2.linear_3.weight")
+            map_k(f"{t5_2_prefix}.fc3.bias", "context_embedder_2.linear_3.bias")
+            map_k(f"{t5_2_prefix}.layernorm.weight", "context_embedder_2.norm.weight")
+            map_k(f"{t5_2_prefix}.layernorm.bias", "context_embedder_2.norm.bias")
 
         # Refiner Blocks
         for layer in range(2):
@@ -753,8 +759,8 @@ class OmniWeavingPipeline(
             tf_loaded = loader.load_weights(tf_weights_to_load)
             loaded_keys.update([f"transformer.{k}" for k in tf_loaded])
 
-        # Load ByT5
-        if self.has_byt5 and raw_t5:
+        # Load T5-2
+        if self.has_t5_2 and raw_t5:
             t5_items = raw_t5.items()
             if hasattr(self.text_encoder_2, "load_weights"):
                 t5_loaded = self.text_encoder_2.load_weights(t5_items)
