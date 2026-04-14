@@ -28,8 +28,8 @@ from transformers import (
     SiglipImageProcessor,
     SiglipVisionModel,
 )
-
 from vllm.model_executor.models.utils import AutoWeightsLoader
+
 from vllm_omni.diffusion.data import DiffusionOutput, OmniDiffusionConfig
 from vllm_omni.diffusion.distributed.cfg_parallel import CFGParallelMixin
 from vllm_omni.diffusion.distributed.utils import get_local_device
