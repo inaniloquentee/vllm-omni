@@ -12,6 +12,7 @@ from typing import Any
 import numpy as np
 import PIL.Image
 import torch
+import vllm.model_executor.model_loader.weight_utils as weight_utils
 from diffusers import AutoencoderKLHunyuanVideo15
 from diffusers.schedulers.scheduling_flow_match_euler_discrete import (
     FlowMatchEulerDiscreteScheduler,
@@ -28,9 +29,7 @@ from transformers import (
     SiglipVisionModel,
 )
 
-import vllm.model_executor.model_loader.weight_utils as weight_utils
 from vllm.model_executor.models.utils import AutoWeightsLoader
-
 from vllm_omni.diffusion.data import DiffusionOutput, OmniDiffusionConfig
 from vllm_omni.diffusion.distributed.cfg_parallel import CFGParallelMixin
 from vllm_omni.diffusion.distributed.utils import get_local_device
