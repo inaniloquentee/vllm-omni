@@ -1,6 +1,7 @@
 import json
 import os
 import subprocess
+import sys
 import threading
 from datetime import datetime
 from pathlib import Path
@@ -21,15 +22,50 @@ os.environ["VLLM_WORKER_MULTIPROC_METHOD"] = "spawn"
 os.environ["VLLM_TEST_CLEAN_GPU_MEMORY"] = "0"
 
 
-CONFIG_FILE_PATH = str(Path(__file__).parent.parent / "tests" / "test.json")
-BENCHMARK_CONFIGS = load_configs(CONFIG_FILE_PATH)
+def _get_config_file_from_argv() -> str | None:
+    """Read ``--config-file`` from ``sys.argv`` at import time so parametrization can use it.
 
+    Supports ``--config-file path`` and ``--config-file=path`` (same pattern as
+    ``run_diffusion_benchmark.py``).
+    """
+    for i, arg in enumerate(sys.argv):
+        if arg == "--config-file" and i + 1 < len(sys.argv):
+            return sys.argv[i + 1]
+        if arg.startswith("--config-file="):
+            return arg.split("=", 1)[1]
+    return None
+
+
+_PERF_TESTS_DIR = Path(__file__).resolve().parent.parent / "tests"
+_DEFAULT_CONFIG_FILE = str(_PERF_TESTS_DIR / "test_omni.json")
+
+CONFIG_FILE_PATH = _get_config_file_from_argv()
+if CONFIG_FILE_PATH is None:
+    print(
+        "No --config-file in argv, using default: tests/dfx/perf/tests/test_omni.json "
+        "(override with e.g. --config-file tests/dfx/perf/tests/test_tts.json)"
+    )
+    CONFIG_FILE_PATH = _DEFAULT_CONFIG_FILE
+
+BENCHMARK_CONFIGS = load_configs(CONFIG_FILE_PATH)
 
 STAGE_CONFIGS_DIR = Path(__file__).parent.parent / "stage_configs"
 test_params = create_unique_server_params(BENCHMARK_CONFIGS, STAGE_CONFIGS_DIR)
 server_to_benchmark_mapping = create_test_parameter_mapping(BENCHMARK_CONFIGS)
 
 _omni_server_lock = threading.Lock()
+
+
+def pytest_addoption(parser: pytest.Parser) -> None:
+    parser.addoption(
+        "--config-file",
+        action="store",
+        default=None,
+        help=(
+            "Path to Omni/TTS serve benchmark JSON (default: tests/dfx/perf/tests/test_omni.json). "
+            "Example: --config-file tests/dfx/perf/tests/test_tts.json"
+        ),
+    )
 
 
 @pytest.fixture(scope="module")
