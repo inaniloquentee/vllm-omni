@@ -53,9 +53,9 @@ steps:
       (build.branch != "main" && (
         build.pull_request.labels includes "nightly-test" ||
         build.pull_request.labels includes "omni-test" ||
-        build.pull_request.labels includes "diffusion-other-test" ||
-        build.pull_request.labels includes "diffusion-wan-test" ||
-        build.pull_request.labels includes "diffusion-qwen-image-test"
+        build.pull_request.labels includes "tts-test" ||
+        build.pull_request.labels includes "diffusion-x2iat-test" ||
+        build.pull_request.labels includes "diffusion-x2v-test"
       ))
     commands:
       - buildkite-agent pipeline upload .buildkite/test-nightly.yml
