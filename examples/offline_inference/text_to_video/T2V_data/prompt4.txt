@@ -1,0 +1,2 @@
+"A delicate watercolor illustration depicts three young women at a dining table celebrating by toasting with red wine glasses."
+Negative: "blurry, low quality, distorted"
