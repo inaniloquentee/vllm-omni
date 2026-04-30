@@ -180,6 +180,12 @@ _OMNI_MODELS = {
         "modeling_moss_tts_nano",
         "MossTTSNanoForGeneration",
     ),
+    ## DeepSeek Janus (HF remote-code MultiModalityCausalLM — AR stage uses Llama subtree only)
+    "MultiModalityCausalLM": (
+        "deepseek_janus",
+        "deepseek_janus_ar",
+        "OmniDeepSeekJanusForConditionalGeneration",
+    ),
     "DyninOmniForConditionalGeneration": (
         "dynin_omni",
         "dynin_omni",

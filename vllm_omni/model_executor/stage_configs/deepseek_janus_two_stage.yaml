@@ -1,0 +1,62 @@
+# DeepSeek Janus two-stage runtime (AR → JanusPipeline).
+# Tuned for a single GPU by default; split ``devices`` across GPUs if available.
+
+stage_args:
+  # Stage 0: Llama AR (OmniDeepSeekJanusForConditionalGeneration — language_model.* only)
+  - stage_id: 0
+    stage_type: llm
+    runtime:
+      process: true
+      devices: "0"
+      max_batch_size: 1
+      requires_multimodal_data: false
+    engine_args:
+      model_stage: AR
+      model_arch: MultiModalityCausalLM
+      worker_cls: vllm_omni.worker.gpu_ar_worker.GPUARWorker
+      scheduler_cls: vllm_omni.core.sched.omni_ar_scheduler.OmniARScheduler
+      gpu_memory_utilization: 0.85
+      enforce_eager: true
+      trust_remote_code: true
+      max_num_seqs: 1
+      tensor_parallel_size: 1
+      pipeline_parallel_size: 1
+      engine_output_type: text
+      enable_prefix_caching: false
+    is_comprehension: false
+    final_output: false
+    default_sampling_params:
+      temperature: 0.7
+      top_p: 0.95
+      max_tokens: 512
+      detokenize: true
+
+  # Stage 1: JanusPipeline (full MultiModalityCausalLM for AR image tokens + VQ decode)
+  - stage_id: 1
+    stage_type: diffusion
+    runtime:
+      process: true
+      devices: "0"
+      max_batch_size: 1
+      requires_multimodal_data: false
+    engine_args:
+      model_stage: dit
+      enforce_eager: true
+      trust_remote_code: true
+      distributed_executor_backend: "mp"
+      parallel_config:
+        tensor_parallel_size: 1
+      omni_kv_config:
+        need_recv_cache: false
+    engine_input_source: [0]
+    custom_process_input_func: vllm_omni.model_executor.stage_input_processors.deepseek_janus.ar2generation
+    final_output: true
+    final_output_type: image
+    default_sampling_params:
+      seed: 52
+
+runtime:
+  enabled: true
+  edges:
+    - from: 0
+      to: 1
