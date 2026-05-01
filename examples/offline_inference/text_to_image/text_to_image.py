@@ -49,6 +49,7 @@ def parse_args() -> argparse.Namespace:
         "Qwen/Qwen-Image, Tongyi-MAI/Z-Image-Turbo, Qwen/Qwen-Image-2512, stepfun-ai/NextStep-1.1, "
         "black-forest-labs/FLUX.1-dev, black-forest-labs/FLUX.2-klein-9B, "
         "black-forest-labs/FLUX.2-dev, tencent/HunyuanImage-3.0-Instruct, "
+        "deepseek-ai/Janus-1.3B, "
         "meituan-longcat/LongCat-Image, OvisAI/Ovis-Image, "
         "stabilityai/stable-diffusion-3.5-medium, Tongyi-MAI/Z-Image-Turbo and etc.",
     )
@@ -57,6 +58,16 @@ def parse_args() -> argparse.Namespace:
         type=str,
         default=None,
         help="Path to a YAML file containing stage configurations for Omni.",
+    )
+    parser.add_argument(
+        "--deploy-config",
+        type=str,
+        default=None,
+        help=(
+            "Optional deploy YAML (pipeline + stage defaults). "
+            "Example for DeepSeek Janus single-stage: "
+            "`vllm_omni/deploy/deepseek_janus_single_stage.yaml`."
+        ),
     )
     parser.add_argument("--prompt", default="a cup of coffee on the table", help="Text prompt for image generation.")
     parser.add_argument(
@@ -402,6 +413,8 @@ def main():
     }
     if args.stage_configs_path:
         omni_kwargs["stage_configs_path"] = args.stage_configs_path
+    if args.deploy_config:
+        omni_kwargs["deploy_config"] = args.deploy_config
     if use_nextstep:
         # NextStep-1.1 requires explicit pipeline class
         omni_kwargs["model_class_name"] = "NextStep11Pipeline"
@@ -433,6 +446,8 @@ def main():
         print(f"  LoRA: scale={args.lora_scale}")
     if args.stage_configs_path:
         print(f"  stage-configs-path: {args.stage_configs_path}")
+    if args.deploy_config:
+        print(f"  deploy-config: {args.deploy_config}")
     print(f"{'=' * 60}\n")
 
     # Build LoRA request when --lora-path is set

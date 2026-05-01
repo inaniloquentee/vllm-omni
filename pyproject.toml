@@ -68,6 +68,7 @@ demo = [
 ]
 
 docs = [
+    "setuptools>=77.0.3,<82.0.0",
     "mkdocs>=1.5.0",
     "mkdocs-api-autonav",
     "mkdocs-material",

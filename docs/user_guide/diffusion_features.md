@@ -108,6 +108,7 @@ The following tables show which models support each feature:
 | Model | ⚡TeaCache | ⚡Cache-DiT | 🔀SP (Ulysses & Ring) | 🔀CFG-Parallel | 🔀Tensor-Parallel | 🔀HSDP | 💾CPU Offload (Layerwise) | 💾VAE-Patch-Parallel | 💾Quantization | 🔄Step Execution |
 |-------|:----------:|:-----------:|:---------------------:|:--------------:|:-----------------:|:------:|:------------------------:|:--------------------:|:--------------:|:----------------:|
 | **Bagel** | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ | ✅  | ❌ | ❌ | ❌ |
+| **DeepSeek Janus** | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
 | **FLUX.1-dev** | ✅ | ✅ | ❌ | ✅ | ✅ | ✅ | ❌ | ❌ | ✅ | ❌ |
 | **FLUX.1-schnell** | ❌ | ✅ | ❌ | ✅ | ✅ | ✅ | ❌ | ❌ | ✅ | ❌ |
 | **FLUX.2-klein** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ | ❌ | ✅ | ❌ |
@@ -133,6 +134,7 @@ The following tables show which models support each feature:
 > Notes:
 > 1. Nextstep_1(T2I) does not support cache acceleration methods such as TeaCache or Cache-DiT.
 > 2. `Tongyi-MAI/Z-Image-Turbo` and `SII-GAIR/daVinci-MagiHuman-Base-1080p` are distilled models with minimal NFEs; CFG-Parallel is not necessary.
+> 3. **DeepSeek Janus** ([`JanusPipeline`](../models/supported_models.md)) uses autoregressive image-token prediction plus VQ decode rather than a classical DiT denoising loop; TeaCache/Cache-DiT and the parallelism / quantization / step-execution paths in this table are not applicable in vLLM-Omni for this pipeline today.
 
 ### VideoGen
 

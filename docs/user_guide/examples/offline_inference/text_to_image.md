@@ -42,6 +42,10 @@ This folder provides several entrypoints for experimenting with text-to-image di
 
 Default model: `Qwen/Qwen-Image`
 
+### DeepSeek Janus
+
+[`deepseek-ai/Janus-1.3B`](https://huggingface.co/deepseek-ai/Janus-1.3B) uses HF remote code (`MultiModalityCausalLM`) and the Omni [`JanusPipeline`](../../../models/supported_models.md). Janus now follows the split `pipeline.py` + `deploy/*.yaml` schema: use `vllm_omni/deploy/deepseek_janus_single_stage.yaml` for the one-stage image-generation path and `vllm_omni/deploy/deepseek_janus_two_stage.yaml` for the AR-to-image path. Typical resolution is **384×384** and `--guidance-scale` around **5.0** works well. See [DeepSeek Janus](deepseek_janus.md).
+
 ## Quick Start
 
 ### Python API

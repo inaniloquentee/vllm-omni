@@ -22,6 +22,8 @@ th {
 | `BagelForConditionalGeneration` | BAGEL (DiT-only) | `ByteDance-Seed/BAGEL-7B-MoT` | ✅︎ | ✅︎ | | ✅︎ |
 | `InternVLAA1Pipeline` | InternVLA-A1 | `InternRobotics/InternVLA-A1-3B` | ✅︎ | ✅︎ | | |
 | `HunyuanImage3ForCausalMM` | HunyuanImage3.0 (DiT-only) | `tencent/HunyuanImage-3.0`, `tencent/HunyuanImage-3.0-Instruct` | ✅︎ | ✅︎ | ✅︎ | ✅︎ |
+| `JanusPipeline` | DeepSeek Janus (single-stage text-to-image, and stage 1 of the two-stage topology) | `deepseek-ai/Janus-1.3B` | ✅︎ | ✅︎ | | |
+| `MultiModalityCausalLM` | DeepSeek Janus (stage 0 AR text generation; Llama subtree only) | `deepseek-ai/Janus-1.3B` (two-stage topology) | ✅︎ | ✅︎ | | |
 | `QwenImagePipeline` | Qwen-Image | `Qwen/Qwen-Image` | ✅︎ | ✅︎ | ✅︎ | ✅︎ |
 | `QwenImagePipeline` | Qwen-Image-2512 | `Qwen/Qwen-Image-2512` | ✅︎ | ✅︎ | ✅︎ | ✅︎ |
 | `QwenImageEditPipeline` | Qwen-Image-Edit | `Qwen/Qwen-Image-Edit` | ✅︎ | ✅︎ | ✅︎ | ✅︎ |

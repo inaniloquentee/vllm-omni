@@ -12,14 +12,43 @@ Architecture:
   processing
 """
 
+from __future__ import annotations
+
+import os
+from contextlib import contextmanager
+
 # We import version early, because it will warn if vLLM / vLLM Omni
 # are not using the same major + minor version (if vLLM is installed).
 # We should do this before applying patch, because vLLM imports might
 # throw in patch if the versions differ.
 from .version import __version__, __version_tuple__  # isort:skip # noqa: F401
 
+
+@contextmanager
+def _temporary_env(key: str, value: str):
+    old = os.environ.get(key)
+    os.environ[key] = value
+    try:
+        yield
+    finally:
+        if old is None:
+            os.environ.pop(key, None)
+        else:
+            os.environ[key] = old
+
+
 try:
-    from . import patch  # noqa: F401
+    # vLLM may import modules that call `torch.compile` at import time on some
+    # versions/configurations. That can fail in environments where Inductor
+    # backends are not fully usable (e.g. `duplicate template name`).
+    #
+    # We only disable Dynamo during *import* to keep `import vllm_omni` safe,
+    # without permanently turning off compilation for the running process.
+    if os.environ.get("TORCHDYNAMO_DISABLE") is None:
+        with _temporary_env("TORCHDYNAMO_DISABLE", "1"):
+            from . import patch  # noqa: F401
+    else:
+        from . import patch  # noqa: F401
 except ModuleNotFoundError as exc:  # pragma: no cover - optional dependency
     if exc.name != "vllm":
         raise
@@ -30,8 +59,6 @@ except ModuleNotFoundError as exc:  # pragma: no cover - optional dependency
 from vllm_omni.transformers_utils import configs as _configs  # noqa: F401, E402
 from vllm_omni.transformers_utils import parsers as _parsers  # noqa: F401, E402
 
-from .config import OmniModelConfig
-
 
 def __getattr__(name: str):
     # Lazy import for AsyncOmni and Omni to avoid pulling in heavy
@@ -40,13 +67,26 @@ def __getattr__(name: str):
     # (e.g. model-architecture inspection) that lack a CUDA context.
     # See: https://github.com/vllm-project/vllm-omni/issues/1793
     if name == "AsyncOmni":
-        from .entrypoints.async_omni import AsyncOmni
-
+        if os.environ.get("TORCHDYNAMO_DISABLE") is None:
+            with _temporary_env("TORCHDYNAMO_DISABLE", "1"):
+                from .entrypoints.async_omni import AsyncOmni
+        else:
+            from .entrypoints.async_omni import AsyncOmni
         return AsyncOmni
     if name == "Omni":
-        from .entrypoints.omni import Omni
-
+        if os.environ.get("TORCHDYNAMO_DISABLE") is None:
+            with _temporary_env("TORCHDYNAMO_DISABLE", "1"):
+                from .entrypoints.omni import Omni
+        else:
+            from .entrypoints.omni import Omni
         return Omni
+    if name == "OmniModelConfig":
+        if os.environ.get("TORCHDYNAMO_DISABLE") is None:
+            with _temporary_env("TORCHDYNAMO_DISABLE", "1"):
+                from .config import OmniModelConfig
+        else:
+            from .config import OmniModelConfig
+        return OmniModelConfig
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 

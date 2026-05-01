@@ -737,6 +737,11 @@ class OmniDiffusionConfig:
                     self.model_class_name = "BagelPipeline"
                     self.tf_model_config = TransformerConfig()
                     self.update_multimodal_support()
+                elif model_type == "multi_modality" or "MultiModalityCausalLM" in architectures:
+                    # DeepSeek Janus (https://github.com/deepseek-ai/Janus)
+                    self.model_class_name = "JanusPipeline"
+                    self.tf_model_config = TransformerConfig()
+                    self.update_multimodal_support()
                 elif model_type == "nextstep":
                     if self.model_class_name is None:
                         self.model_class_name = "NextStep11Pipeline"

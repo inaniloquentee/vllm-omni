@@ -1,0 +1,21 @@
+# DeepSeek Janus single-stage deploy: text-to-image via ``JanusPipeline``.
+#
+# Mirrors ``bagel_single_stage.yaml``: one diffusion stage runs the full HF model
+# (``trust_remote_code``): LLM + ``gen_head`` + VQ decoder from the Janus repo.
+#
+# Example:
+#   vllm serve deepseek-ai/Janus-1.3B --omni \
+#       --deploy-config vllm_omni/deploy/deepseek_janus_single_stage.yaml
+#
+# Programmatically:
+#   Omni(model="...", deploy_config_path="vllm_omni/deploy/deepseek_janus_single_stage.yaml")
+
+pipeline: deepseek_janus_single_stage
+async_chunk: false
+
+stages:
+  - stage_id: 0
+    max_num_seqs: 1
+    devices: "0"
+    default_sampling_params:
+      seed: 52
