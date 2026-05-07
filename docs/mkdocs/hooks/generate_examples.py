@@ -298,6 +298,32 @@ def update_nav_file(examples: list[Example]):
             category_title = fix_case(category.replace("_", " ").title())
             examples_section.append({category_title: category_items})
 
+    # Docs under docs/user_guide/examples/ without a matching examples/<category>/ folder are
+    # skipped by the scanner above; merge them so mkdocs --strict does not fail nav checks.
+    manual_example_nav = {
+        "Offline Inference": [
+            {"DeepSeek Janus": "user_guide/examples/offline_inference/deepseek_janus.md"},
+            {
+                "GLM-Image Multistage End-to-End Inference": ("user_guide/examples/offline_inference/glm_image.md"),
+            },
+        ],
+        "Online Serving": [
+            {"GLM-Image Online Serving": "user_guide/examples/online_serving/glm_image.md"},
+        ],
+    }
+    for group in examples_section:
+        if not isinstance(group, dict):
+            continue
+        for category, extra_items in manual_example_nav.items():
+            if category not in group:
+                continue
+            seen = {v for d in group[category] for v in d.values() if isinstance(d, dict)}
+            for item in extra_items:
+                path = next(iter(item.values()))
+                if path not in seen:
+                    group[category].append(item)
+                    seen.add(path)
+
     # Update the nav structure
     nav_list[user_guide_idx]["User Guide"][examples_idx]["Examples"] = examples_section
 
