@@ -5,7 +5,7 @@
 # for image-token VQ decode (duplicate VRAM — reduce tp / run on multi-GPU later).
 #
 # Example:
-#   vllm serve deepseek-ai/Janus-1.3B --omni \
+#   vllm serve deepseek-ai/Janus-Pro-7B --omni \
 #       --deploy-config vllm_omni/deploy/deepseek_janus_two_stage.yaml
 
 pipeline: deepseek_janus_two_stage
