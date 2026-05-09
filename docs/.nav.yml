@@ -15,36 +15,48 @@ nav:
   - Examples:
     - examples/README.md
     - Offline Inference:
+      - AudioX offline inference: user_guide/examples/offline_inference/audiox.md
       - BAGEL-7B-MoT: user_guide/examples/offline_inference/bagel.md
-      - GLM-Image Multistage End-to-End Inference: user_guide/examples/offline_inference/glm_image.md
+      - Dynin-Omni Offline End2End Example: user_guide/examples/offline_inference/dynin_omni.md
       - Helios Video Generation: user_guide/examples/offline_inference/helios.md
-      - HunyuanImage-3.0 Image-to-Text Inference: user_guide/examples/offline_inference/hunyuan_image3.md
-      - DeepSeek Janus: user_guide/examples/offline_inference/deepseek_janus.md
+      - HunyuanImage-3.0-Instruct: user_guide/examples/offline_inference/hunyuan_image3.md
       - Image-To-Image: user_guide/examples/offline_inference/image_to_image.md
       - Image-To-Video: user_guide/examples/offline_inference/image_to_video.md
       - InternVLA-A1: user_guide/examples/offline_inference/internvla_a1.md
+      - MagiHuman Generation: user_guide/examples/offline_inference/magi_human.md
       - MammothModa2-Preview: user_guide/examples/offline_inference/mammothmodal2_preview.md
       - MiMo-Audio Offline Inference: user_guide/examples/offline_inference/mimo_audio.md
+      - Ming-flash-omni 2.0: user_guide/examples/offline_inference/ming_flash_omni.md
       - Qwen2.5-Omni: user_guide/examples/offline_inference/qwen2_5_omni.md
       - Qwen3-Omni: user_guide/examples/offline_inference/qwen3_omni.md
+      - Speech-To-Video: user_guide/examples/offline_inference/speech_to_video.md
       - Text-To-Audio: user_guide/examples/offline_inference/text_to_audio.md
       - Text-To-Image: user_guide/examples/offline_inference/text_to_image.md
       - Text-To-Speech: user_guide/examples/offline_inference/text_to_speech.md
       - Text-To-Video: user_guide/examples/offline_inference/text_to_video.md
+      - VACE Video Generation: user_guide/examples/offline_inference/vace.md
       - X-To-Video-Audio: user_guide/examples/offline_inference/x_to_video_audio.md
+      - DeepSeek Janus: user_guide/examples/offline_inference/deepseek_janus.md
+      - GLM-Image Multistage End-to-End Inference: user_guide/examples/offline_inference/glm_image.md
     - Online Serving:
+      - AudioX online serving: user_guide/examples/online_serving/audiox.md
       - BAGEL-7B-MoT: user_guide/examples/online_serving/bagel.md
       - vLLM-Omni Helm Chart: user_guide/examples/online_serving/chart-helm.md
       - Diffusers Backend Adapter: user_guide/examples/online_serving/diffusers_pipeline_adapter.md
-      - GLM-Image Online Serving: user_guide/examples/online_serving/glm_image.md
+      - Dynin-Omni Online Serving Example: user_guide/examples/online_serving/dynin_omni.md
+      - Helios Video Generation via Online API: user_guide/examples/online_serving/helios.md
       - Image-To-Image: user_guide/examples/online_serving/image_to_image.md
       - Image-To-Video: user_guide/examples/online_serving/image_to_video.md
       - Online serving Example of vLLM-Omni for MiMo-Audio: user_guide/examples/online_serving/mimo_audio.md
+      - Ming-flash-omni 2.0: user_guide/examples/online_serving/ming_flash_omni.md
+      - OpenAI Chat Completion Client For Multimodal Generation: user_guide/examples/online_serving/openai_chat_completion_client_for_multimodal_generation.md
       - Qwen2.5-Omni: user_guide/examples/online_serving/qwen2_5_omni.md
       - Qwen3-Omni: user_guide/examples/online_serving/qwen3_omni.md
-      - Text-To-Speech: user_guide/examples/online_serving/text_to_speech.md
+      - Stable Audio Online Serving: user_guide/examples/online_serving/stable_audio.md
       - Text-To-Image: user_guide/examples/online_serving/text_to_image.md
+      - Text-To-Speech (Online Serving): user_guide/examples/online_serving/text_to_speech.md
       - Text-To-Video: user_guide/examples/online_serving/text_to_video.md
+      - GLM-Image Online Serving: user_guide/examples/online_serving/glm_image.md
   - General:
     - usage/*
   - Configuration:
@@ -60,13 +72,6 @@ nav:
       - Cache Acceleration:
         - TeaCache: user_guide/diffusion/cache_acceleration/teacache.md
         - Cache-DiT: user_guide/diffusion/cache_acceleration/cache_dit.md
-      - Quantization:
-        - Overview: user_guide/diffusion/quantization/overview.md
-        - AutoRound: user_guide/diffusion/quantization/autoround.md
-        - FP8: user_guide/diffusion/quantization/fp8.md
-        - Int8: user_guide/diffusion/quantization/int8.md
-        - GGUF: user_guide/diffusion/quantization/gguf.md
-        - msModelSlim: user_guide/diffusion/quantization/msmodelslim.md
       - Attention Backends: user_guide/diffusion/attention_backends.md
       - Frame Interpolation: user_guide/diffusion/frame_interpolation.md
       - Parallelism:
