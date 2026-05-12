@@ -4,7 +4,25 @@
 import torch
 import vllm.envs as envs
 from vllm.config import VllmConfig
-from vllm.config.kernel import IrOpPriorityConfig
+
+try:
+    from vllm.config.kernel import IrOpPriorityConfig
+except ImportError:
+    # vllm < 0.20.0 compatibility: IrOpPriorityConfig was merged into KernelConfig
+    from dataclasses import dataclass
+
+    @dataclass
+    class IrOpPriorityConfig:
+        """Fallback for vllm < 0.20.0 where IrOpPriorityConfig doesn't exist."""
+
+        ir_op_priority: list[str]
+        rms_norm_ir_op_priority: list[str] | None = None
+
+        @classmethod
+        def with_default(cls, default, rms_norm=None):
+            return cls(ir_op_priority=default, rms_norm_ir_op_priority=rms_norm)
+
+
 from vllm.logger import init_logger
 from vllm.platforms.cuda import CudaPlatformBase
 from vllm.platforms.interface import DeviceCapability

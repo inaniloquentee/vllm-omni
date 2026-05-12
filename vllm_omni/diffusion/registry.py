@@ -145,6 +145,11 @@ _DIFFUSION_MODELS = {
         "pipeline_janus",
         "JanusPipeline",
     ),
+    "JanusVQDecodePipeline": (
+        "deepseek_janus",
+        "pipeline_janus_vq",
+        "JanusVQDecodePipeline",
+    ),
     "InternVLAA1Pipeline": (
         "internvla_a1",
         "pipeline_internvla_a1",
@@ -277,6 +282,7 @@ _NO_CACHE_ACCELERATION = {
     # Pipelines that do not support cache acceleration (cache_dit / tea_cache).
     "NextStep11Pipeline",
     "JanusPipeline",
+    "JanusVQDecodePipeline",
     "AudioXPipeline",
 }
 

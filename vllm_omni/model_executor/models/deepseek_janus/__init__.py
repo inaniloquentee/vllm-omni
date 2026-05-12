@@ -8,7 +8,11 @@ def __getattr__(name: str):
         from .deepseek_janus_ar import OmniDeepSeekJanusForConditionalGeneration
 
         return OmniDeepSeekJanusForConditionalGeneration
+    if name == "JanusForImageGeneration":
+        from .deepseek_janus_ar import JanusForImageGeneration
+
+        return JanusForImageGeneration
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
-__all__ = ["OmniDeepSeekJanusForConditionalGeneration"]
+__all__ = ["OmniDeepSeekJanusForConditionalGeneration", "JanusForImageGeneration"]

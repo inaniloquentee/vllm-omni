@@ -1,9 +1,16 @@
 from __future__ import annotations
 
+import contextlib
 from contextlib import contextmanager
 from dataclasses import dataclass
 
-import vllm.ir
+try:
+    import vllm.ir
+except ImportError:
+    vllm_ir_available = False
+else:
+    vllm_ir_available = True
+
 from vllm.config import VllmConfig
 
 from vllm_omni.diffusion.attention.backends.abstract import (
@@ -154,9 +161,12 @@ def set_forward_context(
             # Local import to avoid importing vllm.config.vllm at module import time.
             from vllm.config.vllm import set_current_vllm_config
 
-            with (
-                set_current_vllm_config(vllm_config),
-                vllm_config.kernel_config.ir_op_priority.set_priority(),
-                vllm.ir.enable_torch_wrap(vllm_config.compilation_config.ir_enable_torch_wrap),
-            ):
+            ctx_managers = [set_current_vllm_config(vllm_config)]
+            if hasattr(vllm_config.kernel_config, "ir_op_priority"):
+                ctx_managers.append(vllm_config.kernel_config.ir_op_priority.set_priority())
+            if vllm_ir_available:
+                ctx_managers.append(vllm.ir.enable_torch_wrap(vllm_config.compilation_config.ir_enable_torch_wrap))
+            with contextlib.ExitStack() as stack:
+                for mgr in ctx_managers:
+                    stack.enter_context(mgr)
                 yield
